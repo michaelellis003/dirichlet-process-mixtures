@@ -2,7 +2,7 @@
 simulate_data <- function(
     N = 100,    # sample size
     K = 3,      # Number of mixtures
-    mu = c(-10, 0, 10),
+    mu = c(-20, 5, 25),
     sigmasq = c(0.5, 0.5, 0.5),
     probs = c(1/3, 1/3, 1/3),
     plot = TRUE
@@ -181,5 +181,44 @@ mcmc <- function(
             z_save = z_save
         )
     )
+    
+}
+
+# plot output of mcmc ----------------------------------------------------------
+plot_mcmc <- function(output) {
+    library(ggplot2)
+    library(reshape2)
+    
+    theme_set(theme_light())
+    
+    mu_mcmc <- data.frame(output$mu_save)
+    names(mu_mcmc) <- paste0("mu", 1:ncol(mu_mcmc))
+    mu_mcmc$Sample <- 1:nrow(mu_mcmc)
+    mu_mcmc <- melt(mu_mcmc, id.vars = "Sample")
+    
+    ggplot(mu_mcmc, aes(x = Sample, y = value, col=variable)) + 
+        geom_line() + 
+        facet_wrap(~variable, scales = "free_y") +
+        theme(legend.position="none")
+    
+    sigmasq_mcmc <- data.frame(output$sigmasq_save)
+    names(sigmasq_mcmc) <- paste0("sigmasq", 1:ncol(sigmasq_mcmc))
+    sigmasq_mcmc$Sample <- 1:nrow(sigmasq_mcmc)
+    sigmasq_mcmc <- melt(sigmasq_mcmc, id.vars = "Sample")
+    
+    ggplot(sigmasq_mcmc, aes(x = Sample, y = value, col=variable)) + 
+        geom_line() + 
+        facet_wrap(~variable, scales = "free_y") +
+        theme(legend.position="none")
+    
+    pi_mcmc <- data.frame(output$pi_save)
+    names(pi_mcmc) <- paste0("sigmasq", 1:ncol(pi_mcmc))
+    pi_mcmc$Sample <- 1:nrow(pi_mcmc)
+    pi_mcmc <- melt(pi_mcmc, id.vars = "Sample")
+    
+    ggplot(pi_mcmc, aes(x = Sample, y = value, col=variable)) + 
+        geom_line() + 
+        facet_wrap(~variable, scales = "free_y") +
+        theme(legend.position="none")
     
 }
