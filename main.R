@@ -1,7 +1,7 @@
 source("functions.R")
 
-y <- simulate_data()
+y <- simulate_data(N = 200)
 output <- mcmc(y$y)
 
-colSums(output$mu_save)
+colMeans(output$mu_save)
 

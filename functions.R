@@ -57,8 +57,8 @@ stick_breaking <- function(V, K) {
 # mcmc function ----------------------------------------------------------------
 mcmc <- function(
     y,
-    K = 25,
-    lambda0 = 1,
+    K = 20,
+    lambda0 = 0.1,
     mu0 = 0,
     sigmasq0 = 10^2,
     alpha0 = 0.001,
@@ -76,7 +76,7 @@ mcmc <- function(
     sigmasq <- rep(sigmasq0, K)
     V <- c(rbeta(K-1, 1, lambda0), 1)
     pi <- stick_breaking(V, K)
-    z <- sample(1:2, size = N, replace = TRUE)
+    z <- sample(c(1:2, 5), size = N, replace = TRUE)
     
     ## save parameters
     mu_save <- matrix(NA, nrow = n_save, ncol = K)
@@ -90,63 +90,67 @@ mcmc <- function(
         }
         
         clusters <- unique(z)
-        print(clusters)
         counts <- table(z)
-        y_bar_k <- data.frame(y=y, z=z)
-        y_bar_k <- aggregate(x = y_bar_k$y,
-                             by = list(z = y_bar_k$z), 
-                             FUN = mean)
+        y_sum_k <- data.frame(y=y, z=z)
+        y_sum_k <- aggregate(x = y_sum_k$y,
+                             by = list(z = y_sum_k$z), 
+                             FUN = sum)
         
-        
-        ## keep track of number of clusters
-        n_clusters <- max(clusters)
-        for(k in 1:n_clusters) {
-            
-            n_k <- as.vector(counts[names(counts) == k])
-            
-            ### updated parameters for mu
-            a <- 1/(1/sigmasq0 + n_k/sigmasq[k])
-            b <- mu0/sigmasq0 + y_bar_k[y_bar_k$z == k, 2]/sigmasq[k]
-            
-            ### sample mu
-            mu[k] <- rnorm(1, a*b, sqrt(a))
-            
-            ### updated parameters for sigma squared
-            SS <- data.frame(z=z, res=(y-mu[k])^2)
-            SS <- aggregate(x = SS$res,
-                            by = list(z = SS$z), 
-                            FUN = sum)
-            SS <- SS[SS$z == k, 2]
-            updated_alpha <- alpha0 + n_k/2
-            updated_beta <- beta0 + SS/2
-            
-            ### sample sigma squared
-            sigmasq[k] <- 1/rgamma(1, updated_alpha, updated_beta)
+        for(k in 1:K) {
+            if(k %in% clusters) {
+                n_k <- as.vector(counts[names(counts) == k])
+                
+                ## update parameters for mu
+                a <- 1/(1/sigmasq0 + n_k/sigmasq[k])
+                b <- mu0/sigmasq0 + y_sum_k[y_sum_k$z == k, 2]/sigmasq[k]
+                
+                ## sample mu
+                mu[k] <- rnorm(1, a*b, sqrt(a))
+                
+                ## updated parameters for sigma squared
+                SS <- data.frame(z=z, res=(y-mu[k])^2)
+                SS <- aggregate(x = SS$res,
+                                by = list(z = SS$z), 
+                                FUN = sum)
+                SS <- SS[SS$z == k, 2]
+                updated_alpha <- alpha0 + n_k/2
+                updated_beta <- beta0 + SS/2
+                
+                ## sample sigma squared
+                sigmasq[k] <- 1/rgamma(1, updated_alpha, updated_beta)
+                
+            } else { ## sample from prior
+                mu[k] <- rnorm(1, mu0, sqrt(sigmasq0))
+                sigmasq[k] <- 1/rgamma(1, alpha0, beta0)
+            }
         }
         
+        max_cluster <- max(clusters)
         for(k in 1:(K-1)) {
-            
-            n_k <- as.vector(counts[names(counts) == k])
-            
-            ### updated parameters for pi tilde
-            updated_shape <- 1
-            updated_lambda <- lambda0
-            if(k <= n_clusters) {
-                updated_shape <- updated_shape + n_k
-                updated_lambda <- lambda0 + sum(counts[names(counts) > k])
+            if(k %in% clusters) {
+                n_k <- as.integer(counts[names(counts) == k])
+            } else {
+                n_k <- 0
             }
             
-            ### sample V
+            if(k <= max_cluster) {
+                sum_counts <- sum(unname(counts[as.integer(names(counts)) > k]))
+            }
+            
+            ## updated parameters for pi tilde
+            updated_shape <- 1 + n_k
+            updated_lambda <- lambda0 + sum_counts
+            
             V[k] <- rbeta(1, updated_shape, updated_lambda)
         }
         V[K] <- 1
         
-        ### update pi
+        ## update pi
         pi <- stick_breaking(V, K)
         
-        ### sample z
+        ## sample z
         for(j in 1:N) {
-            ### probabilities for z = k
+            ## probabilities for z = k
             z_k_dens <- rep(NA, K)
             z_k_probs <- rep(NA, K)
             for(k in 1:K) {
@@ -167,9 +171,7 @@ mcmc <- function(
             pi_save[index, ] <- pi
             z_save[index, ] <- z
         }
-        
     }
-    
     
     return(
         list(
